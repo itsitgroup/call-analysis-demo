@@ -1,8 +1,13 @@
 import streamlit as st
 import requests
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Backend URL
-BACKEND_URL = st.secrets["CUSTOM_API"]
+# BACKEND_URL = st.secrets["CUSTOM_API"]
+BACKEND_URL = os.getenv("BACKEND")
 
 # Initialize session state
 if 'transcript' not in st.session_state:
