@@ -122,6 +122,20 @@ if st.session_state.transcript:
                 # Track analysis exception
                 track_event("Analysis Exception", {"error": str(e), "user_id": st.session_state['user_id']})
 
+    # Chat About the Call
+    st.subheader("Chat About the Call")
+    user_query = st.text_input("Ask a question about the call:")
+    if st.button("Ask"):
+        with st.spinner("Generating response..."):
+            try:
+                response = requests.post(f"{BACKEND_URL}/ask", json={"query": user_query})
+                if response.status_code == 200:
+                    st.text_area("Response", response.json()["response"], height=150)
+                else:
+                    st.error(response.json().get("error", "An error occurred."))
+            except Exception as e:
+                st.error(f"Error: {e}")
+
 # Display Analysis Results
 if st.session_state.analysis:
     st.subheader("Analysis Results")
