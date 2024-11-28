@@ -1,12 +1,7 @@
 import streamlit as st
 import requests
-import os
 import analytics
 import uuid
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 # Segment analytics configuration
 WRITE_KEY = st.secrets["SECRET_KEY"]
