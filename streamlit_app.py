@@ -1,21 +1,18 @@
 import streamlit as st
 import requests
-import os
 import analytics
 import uuid
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 # Segment analytics configuration
-WRITE_KEY = os.getenv('WRITE_KEY')
+WRITE_KEY = st.secrets['WRITE_KEY']
 analytics.write_key = WRITE_KEY
 
 # Backend URL
-BACKEND_URL = os.getenv("BACKEND")
+BACKEND_URL = st.secrets['BACKEND']
 
 # Initialize session state
+if 'api_key' not in st.session_state:
+    st.session_state['api_key'] = ''
 if 'transcript' not in st.session_state:
     st.session_state['transcript'] = ''
 if 'combined_transcript' not in st.session_state:
@@ -31,12 +28,29 @@ if 'user_id' not in st.session_state:
 
 st.title("Call Transcript Analysis")
 
+# API Key Input
+st.subheader("API Key")
+api_key_input = st.text_input("Enter your API Key:", st.session_state['api_key'], type="password")
+if st.button("Set API Key"):
+    if api_key_input.strip():
+        st.session_state['api_key'] = api_key_input.strip()
+        st.success("API Key set successfully!")
+    else:
+        st.error("Please enter a valid API Key.")
+
 # Function to track events with Segment
 def track_event(event_name, properties=None):
     try:
         analytics.track(user_id=st.session_state['user_id'], event=event_name, properties=properties)
     except Exception as e:
         print(f"Analytics tracking failed: {e}")
+
+# Function to generate headers
+def get_headers():
+    return {
+        "API-Key": st.session_state['api_key'],
+        "User-Session-ID": st.session_state['user_id']
+    }
 
 # File uploader
 uploaded_file = st.file_uploader(
@@ -53,7 +67,7 @@ if uploaded_file:
         with st.spinner("Transcribing..."):
             try:
                 files = {"file": uploaded_file}
-                response = requests.post(f"{BACKEND_URL}/transcribe", files=files)
+                response = requests.post(f"{BACKEND_URL}/transcribe", files=files, headers=get_headers())
                 response_data = response.json()
                 if response.status_code == 200:
                     st.session_state.transcript = response_data["full_transcript"]
@@ -91,9 +105,8 @@ if st.session_state.transcript:
     if st.button("Analyze", key="analyze"):
         with st.spinner("Analyzing the call..."):
             try:
-                headers = {"User-Session-ID": st.session_state['user_id']}
                 data = {"transcript": st.session_state.combined_transcript}
-                response = requests.post(f"{BACKEND_URL}/analyze", json=data, headers=headers)
+                response = requests.post(f"{BACKEND_URL}/analyze", json=data, headers=get_headers())
                 response_data = response.json()
                 if response.status_code == 200:
                     st.session_state.analysis = response_data["analysis"]
@@ -119,11 +132,10 @@ if st.session_state.transcript:
                     st.error("No utterances available for creating embeddings.")
                 else:
                     try:
-                        headers = {"User-Session-ID": st.session_state['user_id']}
                         response = requests.post(
                             f"{BACKEND_URL}/create_embeddings",
                             json={"utterances": st.session_state['utterances']},
-                            headers=headers
+                            headers=get_headers()
                         )
                         if response.status_code == 200:
                             st.success("Embeddings created successfully. You can now chat with the AI!")
@@ -142,8 +154,7 @@ if st.session_state.transcript:
             if user_query.strip():
                 with st.spinner("Generating response..."):
                     try:
-                        headers = {"User-Session-ID": st.session_state['user_id']}
-                        response = requests.post(f"{BACKEND_URL}/ask", json={"query": user_query}, headers=headers)
+                        response = requests.post(f"{BACKEND_URL}/ask", json={"query": user_query}, headers=get_headers())
                         if response.status_code == 200:
                             st.text_area("Response", response.json()["response"], height=150)
                             track_event("Query Success", {"query": user_query, "user_id": st.session_state['user_id']})
@@ -160,10 +171,9 @@ if st.session_state.transcript:
         if st.button("Delete Embeddings", key="delete_embeddings"):
             with st.spinner("Deleting embeddings..."):
                 try:
-                    headers = {"User-Session-ID": st.session_state['user_id']}
                     response = requests.post(
                         f"{BACKEND_URL}/delete-embeddings",
-                        headers=headers
+                        headers=get_headers()
                     )
                     if response.status_code == 200:
                         st.success(response.json().get("message", "Embeddings deleted successfully."))
