@@ -8,7 +8,7 @@ WRITE_KEY = st.secrets['SECRET_KEY']
 analytics.write_key = WRITE_KEY
 
 # Backend URL
-BACKEND_URL = st.secrets['BACKEND']
+BACKEND_URL = st.secrets['CUSTOM_API']
 
 # Initialize session state
 if 'api_key' not in st.session_state:
