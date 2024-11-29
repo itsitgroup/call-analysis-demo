@@ -8,9 +8,11 @@ WRITE_KEY = st.secrets["SECRET_KEY"]
 analytics.write_key = WRITE_KEY
 
 # Backend URL
-BACKEND_URL = st.secrets["CUSTOM_API"]
+BACKEND_URL = st.secrets['BACKEND']
 
 # Initialize session state
+if 'api_key' not in st.session_state:
+    st.session_state['api_key'] = ''
 if 'transcript' not in st.session_state:
     st.session_state['transcript'] = ''
 if 'combined_transcript' not in st.session_state:
@@ -49,7 +51,7 @@ if uploaded_file:
                 track_event("Transcription Started", {"file_name": uploaded_file.name, "user_id": st.session_state['user_id']})
                 
                 files = {"file": uploaded_file}
-                response = requests.post(f"{BACKEND_URL}/transcribe", files=files)
+                response = requests.post(f"{BACKEND_URL}/transcribe", files=files, headers=get_headers())
                 response_data = response.json()
                 if response.status_code == 200:
                     st.session_state.transcript = response_data["full_transcript"]
@@ -70,28 +72,26 @@ if uploaded_file:
                 track_event("Transcription Exception", {"error": str(e), "user_id": st.session_state['user_id']})
 
 if st.session_state.transcript:
-    # Display Full Transcript
     st.subheader("Full Transcript")
     st.text_area(
-        "Full Transcript Text",  # Provide a meaningful label
+        "Full Transcript Text",
         st.session_state.transcript,
         height=150,
         label_visibility="collapsed"
     )
 
-    # Display Diarized Transcript (Speaker Labels)
     st.subheader("Diarized Transcript (Speaker Labels)")
     diarized_text = "\n".join([f"{utterance['speaker']}: {utterance['text']}" for utterance in st.session_state.utterances])
     st.text_area(
-        "Diarized Transcript Text",  # Provide a meaningful label
+        "Diarized Transcript Text",
         diarized_text,
         height=150,
         label_visibility="collapsed"
     )
 
     # Analyze Button
-    if st.button("Analyze"):
-        with st.spinner("Analyzing..."):
+    if st.button("Analyze", key="analyze"):
+        with st.spinner("Analyzing the call..."):
             try:
                 # Track analysis request
                 track_event("Analysis Started", {"transcript_length": len(st.session_state.combined_transcript), "user_id": st.session_state['user_id']})
@@ -114,16 +114,10 @@ if st.session_state.transcript:
                     track_event("Analysis Failed", {"error": error_message, "user_id": st.session_state['user_id']})
             except Exception as e:
                 st.error(str(e))
-                # Track analysis exception
-                track_event("Analysis Exception", {"error": str(e), "user_id": st.session_state['user_id']})
 
-# Display Analysis Results
-if st.session_state.analysis:
-    st.subheader("Analysis Results")
-    try:
-        # Render the analysis as Markdown
+    # Display Analysis Results
+    if st.session_state.analysis:
+        st.subheader("Analysis Results")
         st.markdown(st.session_state.analysis, unsafe_allow_html=True)
     except Exception as e:
         st.error("Unable to render the analysis. Please check the formatting.")
-        # Track rendering exception
-        track_event("Analysis Rendering Exception", {"error": str(e), "user_id": st.session_state['user_id']})
