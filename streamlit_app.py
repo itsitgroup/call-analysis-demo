@@ -155,3 +155,23 @@ if st.session_state.transcript:
                         track_event("Query Exception", {"error": str(e)})
             else:
                 st.error("Please enter a question before clicking 'Ask'.")
+        
+        # Display Delete Embeddings Button
+        if st.button("Delete Embeddings", key="delete_embeddings"):
+            with st.spinner("Deleting embeddings..."):
+                try:
+                    headers = {"User-Session-ID": st.session_state['user_id']}
+                    response = requests.post(
+                        f"{BACKEND_URL}/delete-embeddings",
+                        headers=headers
+                    )
+                    if response.status_code == 200:
+                        st.success(response.json().get("message", "Embeddings deleted successfully."))
+                        st.session_state.embeddings_ready = False  # Reset embeddings_ready state
+                        track_event("Embeddings Deleted", {"user_id": st.session_state['user_id']})
+                    else:
+                        st.error(response.json().get("error", "An error occurred during deletion."))
+                        track_event("Embeddings Deletion Failed", {"error": response.json().get("error")})
+                except Exception as e:
+                    st.error(f"Error: {e}")
+                    track_event("Embeddings Deletion Exception", {"error": str(e)})
