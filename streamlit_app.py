@@ -21,10 +21,22 @@ if 'utterances' not in st.session_state:
     st.session_state['utterances'] = []
 if 'analysis' not in st.session_state:
     st.session_state['analysis'] = ''
+if 'embeddings_ready' not in st.session_state:
+    st.session_state['embeddings_ready'] = False
 if 'user_id' not in st.session_state:
     st.session_state['user_id'] = str(uuid.uuid4())  # Generate a unique user ID
 
 st.title("Call Transcript Analysis")
+
+# API Key Input
+st.subheader("API Key")
+api_key_input = st.text_input("Enter your API Key:", st.session_state['api_key'], type="password")
+if st.button("Set API Key"):
+    if api_key_input.strip():
+        st.session_state['api_key'] = api_key_input.strip()
+        st.success("API Key set successfully!")
+    else:
+        st.error("Please enter a valid API Key.")
 
 # Function to track events with Segment
 def track_event(event_name, properties=None):
@@ -32,6 +44,13 @@ def track_event(event_name, properties=None):
         analytics.track(user_id=st.session_state['user_id'], event=event_name, properties=properties)
     except Exception as e:
         print(f"Analytics tracking failed: {e}")
+
+# Function to generate headers
+def get_headers():
+    return {
+        "API-Key": st.session_state['api_key'],
+        "User-Session-ID": st.session_state['user_id']
+    }
 
 # File uploader
 uploaded_file = st.file_uploader(
@@ -44,12 +63,9 @@ if uploaded_file:
     # Track file upload event
     track_event("File Uploaded", {"file_name": uploaded_file.name, "file_type": uploaded_file.type, "user_id": st.session_state['user_id']})
 
-    if st.button("Transcribe"):
+    if st.button("Transcribe", key="transcribe"):
         with st.spinner("Transcribing..."):
             try:
-                # Track transcription request
-                track_event("Transcription Started", {"file_name": uploaded_file.name, "user_id": st.session_state['user_id']})
-                
                 files = {"file": uploaded_file}
                 response = requests.post(f"{BACKEND_URL}/transcribe", files=files, headers=get_headers())
                 response_data = response.json()
@@ -57,19 +73,15 @@ if uploaded_file:
                     st.session_state.transcript = response_data["full_transcript"]
                     st.session_state.combined_transcript = response_data["combined_transcript"]
                     st.session_state.utterances = response_data["utterances"]
-                    st.success("Transcription completed.")
-                    
-                    # Track transcription success
-                    track_event("Transcription Completed", {"file_name": uploaded_file.name, "user_id": st.session_state['user_id']})
+                    st.session_state['user_id'] = response_data["user_id"]
+                    st.success("Transcription completed successfully.")
+                    track_event("Transcription Completed", {"user_id": st.session_state['user_id']})
                 else:
-                    error_message = response_data.get("error", "An error occurred.")
-                    st.error(error_message)
-                    # Track transcription failure
-                    track_event("Transcription Failed", {"error": error_message, "user_id": st.session_state['user_id']})
+                    st.error(response_data.get("error", "An error occurred."))
+                    track_event("Transcription Failed", {"error": response_data.get("error", "Unknown error")})
             except Exception as e:
-                st.error(str(e))
-                # Track transcription exception
-                track_event("Transcription Exception", {"error": str(e), "user_id": st.session_state['user_id']})
+                st.error(f"Error: {e}")
+                track_event("Transcription Exception", {"error": str(e)})
 
 if st.session_state.transcript:
     st.subheader("Full Transcript")
@@ -93,31 +105,83 @@ if st.session_state.transcript:
     if st.button("Analyze", key="analyze"):
         with st.spinner("Analyzing the call..."):
             try:
-                # Track analysis request
-                track_event("Analysis Started", {"transcript_length": len(st.session_state.combined_transcript), "user_id": st.session_state['user_id']})
-
-                data = {
-                    "transcript": st.session_state.combined_transcript
-                }
-                response = requests.post(f"{BACKEND_URL}/analyze", json=data)
+                data = {"transcript": st.session_state.combined_transcript}
+                response = requests.post(f"{BACKEND_URL}/analyze", json=data, headers=get_headers())
                 response_data = response.json()
                 if response.status_code == 200:
                     st.session_state.analysis = response_data["analysis"]
-                    st.success("Analysis completed.")
-                    
-                    # Track analysis success
-                    track_event("Analysis Completed", {"transcript_length": len(st.session_state.combined_transcript), "user_id": st.session_state['user_id']})
+                    st.success("Analysis completed successfully.")
+                    track_event("Analysis Completed", {"user_id": st.session_state['user_id']})
                 else:
                     error_message = response_data.get("error", "An error occurred.")
                     st.error(error_message)
-                    # Track analysis failure
                     track_event("Analysis Failed", {"error": error_message, "user_id": st.session_state['user_id']})
             except Exception as e:
-                st.error(str(e))
+                st.error(f"Error: {e}")
+                track_event("Analysis Exception", {"error": str(e)})
 
     # Display Analysis Results
     if st.session_state.analysis:
         st.subheader("Analysis Results")
         st.markdown(st.session_state.analysis, unsafe_allow_html=True)
-    except Exception as e:
-        st.error("Unable to render the analysis. Please check the formatting.")
+
+    if not st.session_state.embeddings_ready:
+        if st.button("Start AI Chat", key="start_chat"):
+            with st.spinner("Creating embeddings..."):
+                if not st.session_state['utterances']:
+                    st.error("No utterances available for creating embeddings.")
+                else:
+                    try:
+                        response = requests.post(
+                            f"{BACKEND_URL}/create_embeddings",
+                            json={"utterances": st.session_state['utterances']},
+                            headers=get_headers()
+                        )
+                        if response.status_code == 200:
+                            st.success("Embeddings created successfully. You can now chat with the AI!")
+                            st.session_state.embeddings_ready = True
+                            track_event("Embeddings Created", {"user_id": st.session_state['user_id']})
+                        else:
+                            st.error(response.json().get("error", "An error occurred."))
+                            track_event("Embeddings Creation Failed", {"error": response.json().get("error")})
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+                        track_event("Embeddings Creation Exception", {"error": str(e)})
+    else:
+        st.subheader("Chat About the Call")
+        user_query = st.text_input("Ask a question about the call:")
+        if st.button("Ask", key="ask_query"):
+            if user_query.strip():
+                with st.spinner("Generating response..."):
+                    try:
+                        response = requests.post(f"{BACKEND_URL}/ask", json={"query": user_query}, headers=get_headers())
+                        if response.status_code == 200:
+                            st.text_area("Response", response.json()["response"], height=150)
+                            track_event("Query Success", {"query": user_query, "user_id": st.session_state['user_id']})
+                        else:
+                            st.error(response.json().get("error", "An error occurred."))
+                            track_event("Query Failed", {"error": response.json().get("error")})
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+                        track_event("Query Exception", {"error": str(e)})
+            else:
+                st.error("Please enter a question before clicking 'Ask'.")
+        
+        # Display Delete Embeddings Button
+        if st.button("Delete Embeddings", key="delete_embeddings"):
+            with st.spinner("Deleting embeddings..."):
+                try:
+                    response = requests.post(
+                        f"{BACKEND_URL}/delete-embeddings",
+                        headers=get_headers()
+                    )
+                    if response.status_code == 200:
+                        st.success(response.json().get("message", "Embeddings deleted successfully."))
+                        st.session_state.embeddings_ready = False  # Reset embeddings_ready state
+                        track_event("Embeddings Deleted", {"user_id": st.session_state['user_id']})
+                    else:
+                        st.error(response.json().get("error", "An error occurred during deletion."))
+                        track_event("Embeddings Deletion Failed", {"error": response.json().get("error")})
+                except Exception as e:
+                    st.error(f"Error: {e}")
+                    track_event("Embeddings Deletion Exception", {"error": str(e)})
