@@ -4,7 +4,7 @@ import analytics
 import uuid
 
 # Segment analytics configuration
-WRITE_KEY = st.secrets['WRITE_KEY']
+WRITE_KEY = st.secrets['SECRET_KEY']
 analytics.write_key = WRITE_KEY
 
 # Backend URL
