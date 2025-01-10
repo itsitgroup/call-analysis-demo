@@ -1,3 +1,10 @@
-requests==2.32.3
-streamlit==1.40.1
-analytics-python==1.4.post1
+certifi==2024.12.14
+cffi==1.17.1
+numpy==2.2.1
+openvino==2024.6.0
+openvino-telemetry==2024.1.0
+packaging==24.2
+pip==24.3.1
+pybind11==2.13.6
+pycparser==2.22
+wheel==0.45.1
