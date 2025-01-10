@@ -23,8 +23,8 @@ if 'analysis' not in st.session_state:
     st.session_state['analysis'] = ''
 if 'embeddings_ready' not in st.session_state:
     st.session_state['embeddings_ready'] = False
-if 'user_id' not in st.session_state:
-    st.session_state['user_id'] = str(uuid.uuid4())  # Generate a unique user ID
+if 'user_id' not in st.session_state or not st.session_state['user_id']:
+    st.session_state['user_id'] = str(uuid.uuid4())
 
 st.title("Call Transcript Analysis")
 
