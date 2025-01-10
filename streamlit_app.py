@@ -3,12 +3,16 @@ import requests
 import analytics
 import uuid
 
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 # Segment analytics configuration
-WRITE_KEY = st.secrets['SECRET_KEY']
+WRITE_KEY = os.getenv('SECRET_KEY')
 analytics.write_key = WRITE_KEY
 
 # Backend URL
-BACKEND_URL = st.secrets['BACKEND']
+BACKEND_URL = os.getenv('CUSTOM_API')
 
 # Initialize session state
 if 'api_key' not in st.session_state:
@@ -172,7 +176,7 @@ if st.session_state.transcript:
             with st.spinner("Deleting embeddings..."):
                 try:
                     response = requests.post(
-                        f"{BACKEND_URL}/delete-embeddings",
+                        f"{BACKEND_URL}/delete_embeddings",
                         headers=get_headers()
                     )
                     if response.status_code == 200:
