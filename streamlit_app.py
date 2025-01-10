@@ -2,9 +2,10 @@ import streamlit as st
 import requests
 import analytics
 import uuid
-
 import os
 from dotenv import load_dotenv
+
+# Load environment variables
 load_dotenv()
 
 # Segment analytics configuration
@@ -27,8 +28,12 @@ if 'analysis' not in st.session_state:
     st.session_state['analysis'] = ''
 if 'embeddings_ready' not in st.session_state:
     st.session_state['embeddings_ready'] = False
-if 'user_id' not in st.session_state:
+if 'user_id' not in st.session_state or not st.session_state['user_id']:
     st.session_state['user_id'] = str(uuid.uuid4())  # Generate a unique user ID
+    print(f"Initialized User ID: {st.session_state['user_id']}")
+
+# Log the user ID
+st.write(f"User ID (UUID): {st.session_state['user_id']}")
 
 st.title("Call Transcript Analysis")
 
@@ -46,15 +51,19 @@ if st.button("Set API Key"):
 def track_event(event_name, properties=None):
     try:
         analytics.track(user_id=st.session_state['user_id'], event=event_name, properties=properties)
+        print(f"Event tracked: {event_name}, Properties: {properties}")
     except Exception as e:
         print(f"Analytics tracking failed: {e}")
 
 # Function to generate headers
 def get_headers():
-    return {
+    headers = {
         "API-Key": st.session_state['api_key'],
         "User-Session-ID": st.session_state['user_id']
     }
+    # Log headers being sent
+    print(f"Headers: {headers}")
+    return headers
 
 # File uploader
 uploaded_file = st.file_uploader(
@@ -72,12 +81,17 @@ if uploaded_file:
             try:
                 files = {"file": uploaded_file}
                 response = requests.post(f"{BACKEND_URL}/transcribe", files=files, headers=get_headers())
+                # Log request details
+                print(f"Request URL: {BACKEND_URL}/transcribe")
+                print(f"Response Status: {response.status_code}")
+                print(f"Response Body: {response.text}")
+                
                 response_data = response.json()
                 if response.status_code == 200:
                     st.session_state.transcript = response_data["full_transcript"]
                     st.session_state.combined_transcript = response_data["combined_transcript"]
                     st.session_state.utterances = response_data["utterances"]
-                    st.session_state['user_id'] = response_data["user_id"]
+                    # st.session_state['user_id'] = response_data["user_id"]
                     st.success("Transcription completed successfully.")
                     track_event("Transcription Completed", {"user_id": st.session_state['user_id']})
                 else:
@@ -85,8 +99,10 @@ if uploaded_file:
                     track_event("Transcription Failed", {"error": response_data.get("error", "Unknown error")})
             except Exception as e:
                 st.error(f"Error: {e}")
+                print(f"Exception: {e}")
                 track_event("Transcription Exception", {"error": str(e)})
 
+# Remaining code is the same but with additional debug logs
 if st.session_state.transcript:
     st.subheader("Full Transcript")
     st.text_area(
@@ -104,6 +120,10 @@ if st.session_state.transcript:
         height=150,
         label_visibility="collapsed"
     )
+
+    # Log the user ID and headers before making API requests
+    print(f"User ID before analyze: {st.session_state['user_id']}")
+    print(f"Headers before analyze: {get_headers()}")
 
     # Analyze Button
     if st.button("Analyze", key="analyze"):
