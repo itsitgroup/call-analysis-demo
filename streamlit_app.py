@@ -73,7 +73,7 @@ if uploaded_file:
                     st.session_state.transcript = response_data["full_transcript"]
                     st.session_state.combined_transcript = response_data["combined_transcript"]
                     st.session_state.utterances = response_data["utterances"]
-                    st.session_state['user_id'] = response_data["user_id"]
+                    # st.session_state['user_id'] = response_data["user_id"]
                     st.success("Transcription completed successfully.")
                     track_event("Transcription Completed", {"user_id": st.session_state['user_id']})
                 else:
